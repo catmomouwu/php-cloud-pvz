@@ -100,9 +100,22 @@ async function downloadProfile(key: string, version: number): Promise<ProfileFil
 
 // ---- 本地写回 ----
 
-/** 写回本地存档；改了名的用户同步更新“上次使用的用户”与启动用户 */
-async function writeLocal(files: ArchiveFiles, renames: [string, string][]) {
-  await replaceArchiveFiles(files)
+/** 某个本地用户的文件路径（user{id}.dat 与关卡中途存档） */
+function ownPaths(files: ArchiveFiles, localId: number): string[] {
+  const pattern = new RegExp(`^userdata/(user${localId}\\.dat|game${localId}_\\d+\\.(v4|dat))$`)
+  return [...files.keys()].filter(path => pattern.test(path))
+}
+
+/**
+ * 写回本地存档；改了名的用户同步更新“上次使用的用户”与启动用户。
+ * remoteTimes：从云端拉下来的用户（本地编号 → 云端更新时间），用作这些文件的修改时间（“上次游玩”）。
+ */
+async function writeLocal(files: ArchiveFiles, renames: [string, string][], remoteTimes: Map<number, Date> = new Map()) {
+  const modifiedAt = new Map<string, Date>()
+  for (const [localId, time] of remoteTimes) {
+    for (const path of ownPaths(files, localId)) modifiedAt.set(path, time)
+  }
+  await replaceArchiveFiles(files, modifiedAt)
   const settings = useGameSettings()
   for (const [from, to] of renames) {
     await updateSaveFile('registry.regemu', bytes => renameCurrentUser(bytes, from, to))
@@ -136,6 +149,7 @@ async function reconcilePass(userId: string, allowWrite: boolean): Promise<PassR
   const links: Links = { ...(linkStore.value[userId] ?? {}) }
   const found: ProfileConflict[] = []
   const renames: [string, string][] = []
+  const remoteTimes = new Map<number, Date>()
   let remoteNewer = false
   let needsAnotherPass = false
 
@@ -176,12 +190,14 @@ async function reconcilePass(userId: string, allowWrite: boolean): Promise<PassR
       const added = addProfile(files, content, reservedIds())
       files = added.files
       links[remote.key] = { localId: added.id, version: remote.version, sha256: remote.sha256 }
+      remoteTimes.set(added.id, new Date(remote.updatedAt))
     }
     else {
       const before = local.find(profile => profile.id === localId)
       files = replaceProfile(files, localId, content)
       if (before && before.name !== remote.name) renames.push([before.name, remote.name])
       links[remote.key] = { localId, version: remote.version, sha256: remote.sha256 }
+      remoteTimes.set(localId, new Date(remote.updatedAt))
     }
   }
 
@@ -258,7 +274,7 @@ async function reconcilePass(userId: string, allowWrite: boolean): Promise<PassR
   for (const profile of local) {
     if (linkedLocalIds().has(profile.id) || found.some(conflict => conflict.localId === profile.id)) continue
     const digest = await profileDigest(extractProfile(files, profile.id, profile.name))
-    const same = remoteList.find(remote =>
+    const same = [...remoteByKey.values()].find(remote =>
       !remote.deleted && !claimed.has(remote.key) && remote.name.toLowerCase() === profile.name.toLowerCase())
     if (same) {
       claimed.add(same.key)
@@ -271,14 +287,15 @@ async function reconcilePass(userId: string, allowWrite: boolean): Promise<PassR
     await tryUpload(key, 0, profile)
   }
 
-  // 3) 只在云端的用户：下载到本机
-  for (const remote of remoteList) {
+  // 3) 只在云端的用户：下载到本机。
+  // 要用本轮更新过的 remoteByKey 而不是开头取到的列表：上面刚在云端删除的用户在旧列表里还没删，会被重新下载回来
+  for (const remote of remoteByKey.values()) {
     if (remote.deleted || claimed.has(remote.key)) continue
     if (allowWrite) await applyRemote(remote, null)
     else remoteNewer = true
   }
 
-  if (files !== original) await writeLocal(files, renames)
+  if (files !== original) await writeLocal(files, renames, remoteTimes)
   linkStore.value = { ...linkStore.value, [userId]: links }
   remoteProfiles.value = [...remoteByKey.values()]
   return { conflicts: found, remoteNewer, needsAnotherPass }
@@ -337,7 +354,7 @@ async function resolveConflict(key: string, choice: 'cloud' | 'local'): Promise<
         else {
           const content = await downloadProfile(key, conflict.remote.version)
           const renames: [string, string][] = profile && profile.name !== conflict.remote.name ? [[profile.name, conflict.remote.name]] : []
-          await writeLocal(replaceProfile(files, conflict.localId, content), renames)
+          await writeLocal(replaceProfile(files, conflict.localId, content), renames, new Map([[conflict.localId, new Date(conflict.remote.updatedAt)]]))
           links[key] = { localId: conflict.localId, version: conflict.remote.version, sha256: conflict.remote.sha256 }
         }
       }

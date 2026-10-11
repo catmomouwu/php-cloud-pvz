@@ -1,4 +1,4 @@
-# Cloud PVZ 设计
+# Cloud PvZ 设计
 
 ## 目标
 
@@ -40,10 +40,11 @@ PvZ 的一个存档目录（`userdata/`）里本身就能有多个游戏内用�
 **数据**
 
 - `save_profile`：每个用户一行，当前版本号、名字、摘要、进度统计；删除只打 `deleted_at` 标记，让其他设备也删除。
-- `save_profile_version`：每个用户保留最近 30 个版本；对象在 S3：`saves/{userId}/{profileKey}/{uuid}.zip`；删除记录没有内容。
+- `save_profile_version`（同步记录）：每个用户保留最近 20 条；对象在 S3：`saves/{userId}/{profileKey}/{uuid}.zip`；删除记录没有内容。
+- `save_profile_snapshot`（快照）：用户手动创建，每个用户最多 10 个；内容单独复制一份到 `saves/{userId}/{profileKey}/snapshots/{uuid}.zip`，不随同步记录清理。满额时 `POST` 返回 `409 SNAPSHOT_LIMIT`（附最早的快照），客户端确认后带 `replaceOldest` 重试；新快照写好后才删最早的。
 - 账号内未删除的用户不能重名（不区分大小写，与游戏一致），重名返回 `409 NAME_TAKEN`。
 
-**接口**：`GET /api/profiles`、`PUT|DELETE /api/profiles/:key?base=N`、`GET /api/profiles/:key/versions[/:version]`、`POST /api/profiles/:key/restore`。上传与删除都是乐观并发：服务端先把对象写进 S3，再条件更新 `version`（`WHERE version = N`），失败则删掉刚写的对象并返回 409 和云端当前状态。
+**接口**：`GET /api/profiles`、`PUT|DELETE /api/profiles/:key?base=N`、`GET /api/profiles/:key/versions[/:version]`、`POST /api/profiles/:key/restore`；快照 `GET|POST /api/profiles/:key/snapshots`、`GET|PATCH|DELETE /api/profiles/:key/snapshots/:id`（`GET` 为导出 zip，格式与导入一致）、`POST /api/profiles/:key/snapshots/:id/restore`。上传与删除都是乐观并发：服务端先把对象写进 S3，再条件更新 `version`（`WHERE version = N`），失败则删掉刚写的对象并返回 409 和云端当前状态。
 
 **客户端对齐**（`useCloudSync`）：本机按账号记录 `云端 key → 本地编号 + 基准版本 + 摘要`，对每个用户：
 
@@ -59,7 +60,15 @@ PvZ 的一个存档目录（`userdata/`）里本身就能有多个游戏内用�
 
 触发时机：登录、启动游戏前（有冲突时不启动）、游戏写存档后（防抖 2 秒）、停止游戏后、页面重新可见时、手动“立即同步”。写入 IndexedDB 按 IDBFS 的格式（`timestamp` 为 `Date`），只在游戏未运行时进行。
 
-**回滚**：在用户详情页的“历史版本”里恢复某个版本，会生成一个新版本（已删除的用户恢复后取消删除），随后按上表拉取到本地。
+**备份与还原**：用户详情页的“备份”分类里有快照和同步记录。快照取的是云端当前版本，创建前先同步本地进度。还原快照或同步记录都会生成一条新的同步记录（来源分别为 `snapshot` / `restore`，已删除的用户还原后取消删除），随后按上表拉取到本地。
+
+**存档编辑器**（用户详情页，分类：概览 / 冒险 / 挑战 / 图鉴 / 商店 / 禅境花园 / 备份）：
+
+- `shared/pvz/player-data.ts` 完整读写 `user{id}.dat`：认识的字段逐个解析，禅境花园盆栽按 88 字节原样保留，成就之后的数据（僵尸头像等）整体原样写回，读出再写回逐字节不变。
+- 各分类改同一份草稿，底部统一“保存 / 放弃”；切换分类不重建页面（路由视图的 key 对存档详情只取用户编号）。有未保存的修改时离开或刷新页面要确认。
+- 保存时在一个 IndexedDB 事务里改写文件：先比对打开时的内容，被游戏或云同步改过就放弃（提示重新编辑）；保留原修改时间，网页编辑不算“上次游玩”。改了冒险关卡时可一并删除冒险模式的中途存档（`game{id}_0.v4`）。保存后立即同步，生成一条同步记录。游戏运行时只读。
+- 写入的值与游戏自己产生的一致：挑战通关按 `HasBeatenChallenge` 的阈值写记录（游戏不记录单关解锁，按通关数依次解锁）；商店购买按 `StoreScreen::PurchaseItem`（蜗牛记时间戳、消耗品为 `1000 + 数量`、买智慧树时高度设为 1）；新盆栽按 `InitializePottedPlant`。图鉴“已遇到”由冒险关卡和购买推导（`shared/pvz/discovery.ts`），只能查看。
+- 禅境花园的浇水、施肥等需求由游戏按时间实时计算，存档里没有可直接改的“当前需求”；编辑器提供“今天都已照料”（把上次满足需求的时间设为现在）。
 
 **账号与本机存档**：必须登录才能使用（路由守卫）。退出登录时先停止游戏、推送本地改动，每个用户都与云端一致才清空本机 `userdata/` 与同步记录；否则保留，避免丢数据。
 

@@ -99,12 +99,17 @@ function setScale(scale: ScaleMode) {
   send({ type: 'set-scale', scale })
 }
 
-/** 与运行中实例相比，是否有需要重启才生效的设置改动（缩放可即时生效，不计入） */
+function setMuted(muted: boolean) {
+  if (launchedWith.value) launchedWith.value = { ...launchedWith.value, muted }
+  send({ type: 'set-muted', muted })
+}
+
+/** 与运行中实例相比，是否有需要重启才生效的设置改动（缩放、静音可即时生效，不计入） */
 function needsRestart(current: GameSettings): boolean {
   const launched = launchedWith.value
   if (!launched) return false
   return (Object.keys(current) as (keyof GameSettings)[])
-    .some(key => key !== 'scale' && current[key] !== launched[key])
+    .some(key => key !== 'scale' && key !== 'muted' && current[key] !== launched[key])
 }
 
 export function useGameSession() {
@@ -118,6 +123,7 @@ export function useGameSession() {
     stop,
     restart,
     setScale,
+    setMuted,
     needsRestart,
   }
 }

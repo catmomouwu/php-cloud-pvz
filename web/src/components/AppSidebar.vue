@@ -15,7 +15,7 @@ import {
   SidebarRail,
 } from '@felinic/ui'
 import { useResizeObserver } from '@vueuse/core'
-import { CircleUserRound, Gamepad2, LogOut, Save, Settings } from 'lucide-vue-next'
+import { BookOpen, CircleUserRound, Gamepad2, LogOut, Save, Settings, Trophy } from 'lucide-vue-next'
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -33,6 +33,8 @@ const signOut = useSignOut()
 const items = [
   { name: 'game', to: '/', icon: Gamepad2, labelKey: 'nav.game' },
   { name: 'saves', to: '/saves', icon: Save, labelKey: 'nav.saves' },
+  { name: 'almanac', to: '/almanac', icon: BookOpen, labelKey: 'nav.almanac' },
+  { name: 'achievements', to: '/achievements', icon: Trophy, labelKey: 'nav.achievements' },
   { name: 'settings', to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ]
 

@@ -126,8 +126,26 @@ export interface ProfileVersionDto {
   sha256: string
   size: number
   stats: ProfileStats
-  source: 'upload' | 'restore' | 'delete'
+  source: 'upload' | 'restore' | 'snapshot' | 'delete'
   /** 删除记录没有存档内容，不能下载或恢复 */
   hasContent: boolean
+  createdAt: string
+}
+
+/** 每个用户最多保留的快照数 */
+export const MAX_SNAPSHOTS = 10
+
+/** 快照名长度上限（字符） */
+export const MAX_SNAPSHOT_LABEL_LENGTH = 40
+
+/** 接口：某个用户的一个快照 */
+export interface ProfileSnapshotDto {
+  id: string
+  label: string
+  /** 创建快照时云端的版本号 */
+  sourceVersion: number
+  name: string
+  size: number
+  stats: ProfileStats
   createdAt: string
 }

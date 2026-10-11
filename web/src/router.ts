@@ -25,9 +25,11 @@ export const router = createRouter({
         // 游戏页由 AppLayout 常驻渲染，这里只放一个空元素占位（让切换动画有元素可用）
         { path: '', name: 'game', component: { render: () => h('div', { class: 'h-full' }) }, meta: { titleKey: 'nav.game' } },
         { path: 'saves', name: 'saves', component: () => import('./pages/SavesPage.vue'), meta: { titleKey: 'nav.saves', depth: 1 } },
-        { path: 'saves/:id(\\d+)', name: 'profile', component: () => import('./pages/ProfileDetailPage.vue'), meta: { titleKey: 'nav.saves', depth: 2 } },
+        { path: 'saves/:id(\\d+)/:section?', name: 'profile', component: () => import('./pages/ProfileDetailPage.vue'), meta: { titleKey: 'nav.saves', depth: 2 } },
         // 历史版本已并入各用户的详情页
         { path: 'history', redirect: { name: 'saves' } },
+        { path: 'almanac', name: 'almanac', component: () => import('./pages/AlmanacPage.vue'), meta: { titleKey: 'nav.almanac', depth: 1 } },
+        { path: 'achievements', name: 'achievements', component: () => import('./pages/AchievementsPage.vue'), meta: { titleKey: 'nav.achievements', depth: 1 } },
         { path: 'settings', name: 'settings', component: () => import('./pages/SettingsPage.vue'), meta: { titleKey: 'nav.settings' } },
       ],
     },

@@ -17,6 +17,7 @@ export type PlayerToParent =
 
 export type ParentToPlayer =
   | { source: typeof MESSAGE_SOURCE, type: 'set-scale', scale: ScaleMode }
+  | { source: typeof MESSAGE_SOURCE, type: 'set-muted', muted: boolean }
   | { source: typeof MESSAGE_SOURCE, type: 'flush' }
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never

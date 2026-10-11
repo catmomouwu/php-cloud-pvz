@@ -66,23 +66,38 @@ function openForWrite(): Promise<IDBDatabase> {
   })
 }
 
-/** 读取 /saves 下的全部文件，键为完整路径 */
-export async function readSaveFiles(): Promise<Map<string, Uint8Array>> {
-  const files = new Map<string, Uint8Array>()
+export interface SaveEntry {
+  contents: Uint8Array
+  /** 文件最后修改时间（引擎写入时间） */
+  modifiedAt: Date
+}
+
+/** 读取 /saves 下的全部文件及修改时间，键为完整路径 */
+export async function readSaveEntries(): Promise<Map<string, SaveEntry>> {
+  const entries = new Map<string, SaveEntry>()
   const db = await openExisting()
-  if (!db) return files
+  if (!db) return entries
   try {
-    if (!db.objectStoreNames.contains(STORE_NAME)) return files
+    if (!db.objectStoreNames.contains(STORE_NAME)) return entries
     const store = db.transaction(STORE_NAME, 'readonly').objectStore(STORE_NAME)
     const [keys, values] = await Promise.all([request(store.getAllKeys()), request(store.getAll())])
     keys.forEach((key, i) => {
-      const contents = (values[i] as IdbfsEntry | undefined)?.contents
-      if (contents instanceof Uint8Array) files.set(String(key), contents)
+      const value = values[i] as IdbfsEntry | undefined
+      if (value?.contents instanceof Uint8Array) {
+        entries.set(String(key), { contents: value.contents, modifiedAt: new Date(value.timestamp) })
+      }
     })
   }
   finally {
     db.close()
   }
+  return entries
+}
+
+/** 读取 /saves 下的全部文件，键为完整路径 */
+export async function readSaveFiles(): Promise<Map<string, Uint8Array>> {
+  const files = new Map<string, Uint8Array>()
+  for (const [path, entry] of await readSaveEntries()) files.set(path, entry.contents)
   return files
 }
 
@@ -96,20 +111,34 @@ export function toArchiveFiles(saveFiles: Map<string, Uint8Array>): ArchiveFiles
   return files
 }
 
-/** 用云端存档替换本地 userdata/（registry.regemu、缓存等不动） */
-export async function replaceArchiveFiles(files: ArchiveFiles): Promise<void> {
+function sameBytes(a: Uint8Array | undefined, b: Uint8Array): boolean {
+  if (!a || a.byteLength !== b.byteLength) return false
+  for (let i = 0; i < a.byteLength; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+/**
+ * 替换本地 userdata/（registry.regemu、缓存等不动）。
+ * 内容没变的文件保留原修改时间；变了的用 modifiedAt 里给的时间（如云端更新时间），否则用当前时间。
+ * 修改时间就是“上次游玩”的来源，不能因为同步而被刷新。
+ */
+export async function replaceArchiveFiles(files: ArchiveFiles, modifiedAt: Map<string, Date> = new Map()): Promise<void> {
   const db = await openForWrite()
   try {
     const tx = db.transaction(STORE_NAME, 'readwrite')
     const store = tx.objectStore(STORE_NAME)
     const prefix = `${MOUNT}${ARCHIVE_DIR}`
-    const keys = await request(store.getAllKeys())
-    for (const key of keys) {
+    const [keys, values] = await Promise.all([request(store.getAllKeys()), request(store.getAll())])
+    const previous = new Map<string, IdbfsEntry>()
+    keys.forEach((key, i) => {
       const path = String(key)
-      if (path === prefix.slice(0, -1) || path.startsWith(prefix)) store.delete(key)
-    }
+      if (path === prefix.slice(0, -1) || path.startsWith(prefix)) {
+        previous.set(path, values[i] as IdbfsEntry)
+        store.delete(key)
+      }
+    })
 
-    const timestamp = new Date()
+    const now = new Date()
     const dirs = new Set<string>()
     for (const path of files.keys()) {
       const parts = path.split('/').slice(0, -1)
@@ -117,9 +146,11 @@ export async function replaceArchiveFiles(files: ArchiveFiles): Promise<void> {
     }
     dirs.add(ARCHIVE_DIR.slice(0, -1))
     for (const dir of dirs) {
-      store.put({ timestamp, mode: DIR_MODE } satisfies IdbfsEntry, `${MOUNT}${dir}`)
+      store.put({ timestamp: now, mode: DIR_MODE } satisfies IdbfsEntry, `${MOUNT}${dir}`)
     }
     for (const [path, contents] of files) {
+      const old = previous.get(`${MOUNT}${path}`)
+      const timestamp = sameBytes(old?.contents, contents) ? new Date(old!.timestamp) : modifiedAt.get(path) ?? now
       store.put({ timestamp, mode: FILE_MODE, contents } satisfies IdbfsEntry, `${MOUNT}${path}`)
     }
     await transactionDone(tx)
@@ -138,6 +169,45 @@ export async function updateSaveFile(path: string, update: (current: Uint8Array 
     const entry = await request(store.get(`${MOUNT}${path}`)) as IdbfsEntry | undefined
     const next = update(entry?.contents ?? null)
     if (next) store.put({ timestamp: new Date(), mode: entry?.mode ?? FILE_MODE, contents: next } satisfies IdbfsEntry, `${MOUNT}${path}`)
+    await transactionDone(tx)
+  }
+  finally {
+    db.close()
+  }
+}
+
+/** 写入前发现文件已被别处改过（游戏或云同步），放弃这次写入 */
+export class StaleSaveError extends Error {}
+
+/**
+ * 在一个事务里改写或删除 /saves 下的若干文件（contents 为 null 表示删除），路径相对 /saves。
+ * 改写保留原修改时间：在网页上编辑存档不算“玩过”，不能刷新“上次游玩”。
+ * expected 给出改写前应有的内容，与当前不一致时抛 StaleSaveError、不做任何修改。
+ */
+export async function patchSaveFiles(changes: Map<string, Uint8Array | null>, expected: Map<string, Uint8Array> = new Map()): Promise<void> {
+  const db = await openForWrite()
+  try {
+    const tx = db.transaction(STORE_NAME, 'readwrite')
+    const store = tx.objectStore(STORE_NAME)
+    const paths = [...new Set([...changes.keys(), ...expected.keys()])]
+    const current = new Map(await Promise.all(paths.map(async path =>
+      [path, await request(store.get(`${MOUNT}${path}`)) as IdbfsEntry | undefined] as const)))
+
+    for (const [path, contents] of expected) {
+      const entry = current.get(path)
+      if (!entry?.contents || !sameBytes(entry.contents, contents)) {
+        tx.abort()
+        throw new StaleSaveError(path)
+      }
+    }
+    for (const [path, contents] of changes) {
+      if (contents === null) {
+        store.delete(`${MOUNT}${path}`)
+        continue
+      }
+      const entry = current.get(path)
+      store.put({ timestamp: entry ? new Date(entry.timestamp) : new Date(), mode: entry?.mode ?? FILE_MODE, contents } satisfies IdbfsEntry, `${MOUNT}${path}`)
+    }
     await transactionDone(tx)
   }
   finally {

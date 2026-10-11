@@ -29,6 +29,8 @@ export interface PlayerDetails {
   hasUnlockedSurvival: boolean
   pottedPlantCount: number
   achievements: boolean[]
+  /** 各模式记录，下标 = GameMode - 1（生存为旗数，小游戏 / 解谜为完成次数） */
+  challengeRecords: number[]
 }
 
 const CHALLENGE_RECORD_COUNT = 100
@@ -76,7 +78,7 @@ export function parsePlayerDat(bytes: Uint8Array): PlayerDetails | null {
   const level = reader.i32()
   const coins = reader.i32()
   const finishedAdventure = reader.u32()
-  reader.skip(CHALLENGE_RECORD_COUNT * 4)
+  const challengeRecords = Array.from({ length: CHALLENGE_RECORD_COUNT }, () => reader.u32())
   reader.skip(PURCHASE_COUNT * 4)
   const playTimeActive = reader.u32()
   const playTimeInactive = reader.u32()
@@ -103,6 +105,7 @@ export function parsePlayerDat(bytes: Uint8Array): PlayerDetails | null {
     hasUnlockedSurvival: flags[12] !== 0,
     pottedPlantCount,
     achievements,
+    challengeRecords,
   }
 }
 

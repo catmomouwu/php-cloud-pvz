@@ -5,7 +5,8 @@
 import { toast } from '@felinic/ui'
 import { type ArchiveFiles, packZip } from '@shared/pvz/archive'
 import { renameCurrentUser } from '@shared/pvz/game-config'
-import { deleteProfile, duplicateProfile, exportProfile, ProfileOperationError, renameProfile } from '@shared/pvz/profiles'
+import type { ImportCandidate } from '@shared/pvz/import'
+import { addProfile, deleteProfile, duplicateProfile, exportProfile, MAX_PROFILES, listProfiles, ProfileOperationError, renameProfile } from '@shared/pvz/profiles'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { readSaveFiles, replaceArchiveFiles, toArchiveFiles, updateSaveFile } from '@/lib/idbfs'
@@ -99,5 +100,22 @@ export function useProfileActions() {
     }
   }
 
-  return { busy, rename, duplicate, remove, exportZip }
+  /** 导入选中的用户：都作为新用户加入，重名时自动改用副本名。返回错误文案，成功返回 null */
+  async function importProfiles(candidates: ImportCandidate[]): Promise<string | null> {
+    const added: string[] = []
+    const error = await mutate((files) => {
+      let next = files
+      if (listProfiles(next).length + candidates.length > MAX_PROFILES) throw new ProfileOperationError('too-many')
+      for (const candidate of candidates) {
+        const result = addProfile(next, candidate.profile)
+        next = result.files
+        added.push(result.name)
+      }
+      return next
+    })
+    if (!error) toast.success(t('saves.import.done', { count: added.length, names: added.join('、') }))
+    return error
+  }
+
+  return { busy, rename, duplicate, remove, exportZip, importProfiles }
 }

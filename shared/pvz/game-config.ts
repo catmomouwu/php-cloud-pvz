@@ -20,14 +20,13 @@ export const PARTNER_LOGO_PNG_BASE64
 
 export type ScaleMode = 'fit' | 'integer'
 
-/** 外层页面可调整的游戏设置；除 scale 外都在启动时写入 registry.regemu */
+/** 外层页面可调整的游戏设置；scale 与 muted 由外层即时控制，其余在启动时写入 registry.regemu */
 export interface GameSettings {
   /** 启动时选中的游戏内用户；null 表示沿用游戏记录的上次用户 */
   launchUser: string | null
   musicVolume: number
   sfxVolume: number
   muted: boolean
-  customCursors: boolean
   vsync: boolean
   scale: ScaleMode
 }
@@ -38,7 +37,6 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   musicVolume: 85,
   sfxVolume: 85,
   muted: false,
-  customCursors: true,
   vsync: true,
   scale: 'fit',
 }
@@ -48,8 +46,8 @@ export function applySettingsToRegistry(existing: Uint8Array | null, settings: G
   const registry = parseRegistry(existing)
   setDword(registry, REGISTRY_KEY, 'MusicVolume', Math.round(settings.musicVolume))
   setDword(registry, REGISTRY_KEY, 'SfxVolume', Math.round(settings.sfxVolume))
-  setDword(registry, REGISTRY_KEY, 'Muted', settings.muted ? 1 : 0)
-  setDword(registry, REGISTRY_KEY, 'CustomCursors', settings.customCursors ? 1 : 0)
+  // 静音由游戏页面在音频输出上即时控制；引擎自己的静音一旦打开，外面就没法再取消，所以总是写 0
+  setDword(registry, REGISTRY_KEY, 'Muted', 0)
   setDword(registry, REGISTRY_KEY, 'WaitForVSync', settings.vsync ? 1 : 0)
   if (settings.launchUser) setString(registry, REGISTRY_KEY, 'CurUser', settings.launchUser)
   return serializeRegistry(registry)
@@ -74,13 +72,9 @@ export function readSettingsFromRegistry(bytes: Uint8Array | null): Partial<Game
   const result: Partial<GameSettings> = {}
   const music = getDword(registry, REGISTRY_KEY, 'MusicVolume')
   const sfx = getDword(registry, REGISTRY_KEY, 'SfxVolume')
-  const muted = getDword(registry, REGISTRY_KEY, 'Muted')
-  const cursors = getDword(registry, REGISTRY_KEY, 'CustomCursors')
   const vsync = getDword(registry, REGISTRY_KEY, 'WaitForVSync')
   if (music !== null) result.musicVolume = music
   if (sfx !== null) result.sfxVolume = sfx
-  if (muted !== null) result.muted = muted !== 0
-  if (cursors !== null) result.customCursors = cursors !== 0
   if (vsync !== null) result.vsync = vsync !== 0
   return result
 }

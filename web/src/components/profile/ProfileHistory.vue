@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 单个游戏内用户的云端历史版本：下载、恢复
+// 同步记录：每次同步自动产生，保留最近 20 次；可下载、还原
 import {
   Button,
   ConfirmPopover,
@@ -62,6 +62,7 @@ watch([key, currentVersion], () => void load(), { immediate: true })
 
 function sourceText(version: ProfileVersionDto): string {
   if (version.source === 'delete') return t('saves.history.sourceDelete')
+  if (version.source === 'snapshot') return t('saves.history.sourceSnapshot')
   return version.source === 'restore' ? t('saves.history.sourceRestore') : t('saves.history.sourceUpload')
 }
 

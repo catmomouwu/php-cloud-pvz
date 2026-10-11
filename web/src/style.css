@@ -44,3 +44,17 @@
 .page-fade-leave-to {
   opacity: 0;
 }
+
+/* 页面内的区块切换（存档详情的分类、保存栏）：只改透明度，先出后进，离场元素留在原位，不脱离文档流 */
+.section-fade-enter-active {
+  transition: opacity 90ms ease-out;
+}
+
+.section-fade-leave-active {
+  transition: opacity 40ms ease-in;
+}
+
+.section-fade-enter-from,
+.section-fade-leave-to {
+  opacity: 0;
+}

@@ -62,8 +62,9 @@ const scaleItems = computed(() => [
   { value: 'integer' as const, label: t('gameSettings.scaleInteger') },
 ])
 
-// 缩放由外层页面控制，可以即时生效
+// 缩放、静音由外层页面控制，可以即时生效
 watch(() => settings.value.scale, value => session.setScale(value))
+watch(() => settings.value.muted, value => session.setMuted(value))
 
 const pendingRestart = computed(() => session.status.value === 'running' && session.needsRestart(settings.value))
 </script>
@@ -175,12 +176,6 @@ const pendingRestart = computed(() => session.status.value === 'running' && sess
           :items="scaleItems"
           :aria-label="t('gameSettings.scale')"
         />
-      </SettingsRow>
-      <SettingsRow
-        :label="t('gameSettings.customCursors')"
-        :description="t('gameSettings.customCursorsHint')"
-      >
-        <Switch v-model="settings.customCursors" />
       </SettingsRow>
       <SettingsRow :label="t('gameSettings.vsync')">
         <Switch v-model="settings.vsync" />

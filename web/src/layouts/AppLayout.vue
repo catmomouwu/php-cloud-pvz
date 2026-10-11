@@ -3,7 +3,7 @@ import { SidebarInset, SidebarProvider } from '@felinic/ui'
 import { useMediaQuery, useStorage, useTitle } from '@vueuse/core'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { type RouteLocationNormalizedLoaded, useRoute, useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import CollapsedSidebarBar from '@/components/CollapsedSidebarBar.vue'
 import RouteTransition from '@/components/RouteTransition.vue'
@@ -47,6 +47,11 @@ const sidebarOpen = computed({
 watch(() => route.path, () => {
   narrowOpen.value = false
 })
+
+/** 页面实例的身份：存档详情里切换分类只换地址，不重建页面（编辑中的草稿要保留） */
+function pageKey(current: RouteLocationNormalizedLoaded): string {
+  return current.name === 'profile' ? `profile:${String(current.params.id)}` : current.fullPath
+}
 </script>
 
 <template>
@@ -62,7 +67,7 @@ watch(() => route.path, () => {
           <RouteTransition :name="transitionName">
             <component
               :is="Component"
-              :key="current.fullPath"
+              :key="pageKey(current)"
             />
           </RouteTransition>
         </RouterView>

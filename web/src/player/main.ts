@@ -66,6 +66,41 @@ document.addEventListener('fullscreenchange', resizeCanvas)
 canvas.addEventListener('contextmenu', event => event.preventDefault())
 resizeCanvas()
 
+// ---- 声音：静音即时生效 ----
+// 引擎（SDL）在 wasm 里把音乐和音效混成一路，再接到 AudioContext 的输出上，没有对外的音量接口。
+// 这里拦截“接到输出”这一步，在中间插一个总增益节点：静音时把它调到 0，不需要重启游戏。
+// 音乐、音效各自的音量只能由引擎在启动时从 registry 读取。
+
+const masterGains: GainNode[] = []
+const gainByContext = new WeakMap<BaseAudioContext, GainNode>()
+let muted = settings.muted
+
+function installMasterGain() {
+  const connect = AudioNode.prototype.connect as (this: AudioNode, ...args: unknown[]) => unknown
+  AudioNode.prototype.connect = function (this: AudioNode, ...args: unknown[]) {
+    const [destination] = args
+    if (destination instanceof AudioDestinationNode) {
+      let gain = gainByContext.get(destination.context)
+      if (!gain) {
+        gain = destination.context.createGain()
+        gain.gain.value = muted ? 0 : 1
+        connect.call(gain, destination)
+        gainByContext.set(destination.context, gain)
+        masterGains.push(gain)
+      }
+      return connect.call(this, gain, ...args.slice(1))
+    }
+    return connect.apply(this, args)
+  } as AudioNode['connect']
+}
+
+function setMuted(value: boolean) {
+  muted = value
+  for (const gain of masterGains) gain.gain.value = value ? 0 : 1
+}
+
+installMasterGain()
+
 // ---- Emscripten 运行时 ----
 
 const runtimeReady = new Promise<void>((resolve, reject) => {
@@ -227,6 +262,9 @@ window.addEventListener('message', (event) => {
   if (message.type === 'set-scale') {
     scaleMode = message.scale
     resizeCanvas()
+  }
+  else if (message.type === 'set-muted') {
+    setMuted(message.muted)
   }
   else if (message.type === 'flush') {
     dirty = true

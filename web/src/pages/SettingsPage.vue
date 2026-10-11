@@ -25,6 +25,7 @@ import { type ThemeMode, useTheme } from '@/composables/useTheme'
 import { type Locale, LOCALES, setLocale } from '@/i18n'
 
 const APP_VERSION = '0.1.0'
+const PROJECT_URL = 'https://github.com/sheepbox8646/cloud-pvz'
 const ENGINE_URL = 'https://github.com/wszqkzqk/PvZ-Portable'
 const STEAM_URL = 'https://store.steampowered.com/app/3590/Plants_vs_Zombies_GOTY_Edition/'
 
@@ -127,8 +128,19 @@ const resourceDescription = computed(() => {
           <SettingsRow :label="t('settings.license')">
             <span class="text-body text-muted-foreground">GPL-3.0</span>
           </SettingsRow>
+          <SettingsRow :label="t('settings.project')">
+            <TextButton
+              as="a"
+              :href="PROJECT_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+              <ArrowUpRight />
+            </TextButton>
+          </SettingsRow>
           <SettingsRow
-            :label="t('settings.engine')"
+            label="PvZ-Portable"
             :description="t('settings.engineDescription')"
           >
             <TextButton

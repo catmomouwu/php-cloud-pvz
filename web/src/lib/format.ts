@@ -20,9 +20,3 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-/** 游戏时长：“2 小时 5 分” / “12 分钟” */
-export function formatPlayTime(seconds: number, t: (key: string, values: Record<string, number>) => string): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  return h > 0 ? t('saves.hours', { h, m }) : t('saves.minutes', { m })
-}

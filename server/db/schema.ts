@@ -79,9 +79,26 @@ export const saveProfileVersion = sqliteTable('save_profile_version', {
   sha256: text('sha256').notNull(),
   size: integer('size').notNull(),
   stats: text('stats').notNull(),
-  /** upload：同步上传；restore：从历史恢复；delete：删除 */
-  source: text('source', { enum: ['upload', 'restore', 'delete'] }).notNull(),
+  /** upload：同步上传；restore：从同步记录还原；snapshot：从快照还原；delete：删除 */
+  source: text('source', { enum: ['upload', 'restore', 'snapshot', 'delete'] }).notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, table => [uniqueIndex('save_profile_version_profile_version_idx').on(table.profileId, table.version)])
 
-export const schema = { user, session, account, verification, saveProfile, saveProfileVersion }
+/** 用户手动创建的快照：内容单独存一份，不随同步记录清理 */
+export const saveProfileSnapshot = sqliteTable('save_profile_snapshot', {
+  id: text('id').primaryKey(),
+  profileId: text('profile_id').notNull().references(() => saveProfile.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  label: text('label').notNull(),
+  /** 创建快照时云端的版本号 */
+  sourceVersion: integer('source_version').notNull(),
+  objectKey: text('object_key').notNull(),
+  /** 存档里的用户名（快照创建时） */
+  name: text('name').notNull(),
+  sha256: text('sha256').notNull(),
+  size: integer('size').notNull(),
+  stats: text('stats').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, table => [index('save_profile_snapshot_profile_id_idx').on(table.profileId)])
+
+export const schema = { user, session, account, verification, saveProfile, saveProfileVersion, saveProfileSnapshot }

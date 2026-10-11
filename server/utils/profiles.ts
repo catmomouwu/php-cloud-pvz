@@ -18,7 +18,7 @@ import type { H3Event } from 'h3'
 import { saveProfile, saveProfileVersion } from '../db/schema'
 
 /** 每个用户保留的历史版本数 */
-export const KEEP_VERSIONS = 30
+export const KEEP_VERSIONS = 20
 
 type ProfileRow = typeof saveProfile.$inferSelect
 type VersionRow = typeof saveProfileVersion.$inferSelect
@@ -102,9 +102,9 @@ interface CommitInput {
   userId: string
   key: string
   profile: ProfileFiles
-  /** 客户端基于的版本；null 表示不检查（恢复历史版本） */
+  /** 客户端基于的版本；null 表示不检查（还原同步记录或快照） */
   baseVersion: number | null
-  source: 'upload' | 'restore'
+  source: 'upload' | 'restore' | 'snapshot'
 }
 
 /** 写入一个用户的新版本（新建 / 更新 / 从删除状态恢复） */

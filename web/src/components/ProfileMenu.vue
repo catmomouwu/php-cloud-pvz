@@ -15,10 +15,11 @@ import {
   Input,
 } from '@felinic/ui'
 import { MAX_PROFILE_NAME_LENGTH } from '@shared/pvz/profiles'
-import { Copy, Download, Ellipsis, Pencil, Trash2 } from 'lucide-vue-next'
+import { Copy, Download, Ellipsis, Pencil, Play, Trash2 } from 'lucide-vue-next'
 import { nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useGameSession } from '@/composables/useGameSession'
+import { usePlayAs } from '@/composables/usePlayAs'
 import { type ProfileRef, useProfileActions } from '@/composables/useProfileActions'
 
 const props = withDefaults(defineProps<{
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const session = useGameSession()
 const actions = useProfileActions()
+const playAs = usePlayAs()
 
 const renameOpen = ref(false)
 const renameValue = ref('')
@@ -96,6 +98,11 @@ async function confirmDelete() {
         <DropdownMenuLabel>{{ t('saves.runningHint') }}</DropdownMenuLabel>
         <DropdownMenuSeparator />
       </template>
+      <DropdownMenuItem @select="playAs(profile.name)">
+        <Play />
+        {{ t('saves.play') }}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
       <DropdownMenuItem
         :disabled="session.isActive.value"
         @select="openRename"

@@ -1,4 +1,4 @@
-# Cloud PVZ — Agent 指南
+# Cloud PvZ — Agent 指南
 
 - 设计与约定见 `docs/design.md`。
 - Web/UI 工作先读 `packages/ui/AGENTS.md`（@felinic/ui 设计规范），它会指向 `packages/ui/skills/` 下的页面级规范。组合组件，不手写样式与颜色。

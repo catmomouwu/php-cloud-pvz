@@ -62,7 +62,7 @@ function bindFrame(el: unknown) {
               :src="src"
               :class="['absolute inset-0 size-full border-0', status !== 'running' && 'invisible']"
               allow="fullscreen; autoplay; gamepad"
-              title="Cloud PVZ"
+              title="Cloud PvZ"
             />
             <div
               v-if="status !== 'running'"
