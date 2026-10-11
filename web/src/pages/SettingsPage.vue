@@ -24,7 +24,8 @@ import { useResourceStatus } from '@/composables/useResourceStatus'
 import { type ThemeMode, useTheme } from '@/composables/useTheme'
 import { type Locale, LOCALES, setLocale } from '@/i18n'
 
-const APP_VERSION = '0.1.0'
+// 版本号取自 package.json，发版时只改那一处
+const APP_VERSION = __APP_VERSION__
 const PROJECT_URL = 'https://github.com/sheepbox8646/cloud-pvz'
 const ENGINE_URL = 'https://github.com/wszqkzqk/PvZ-Portable'
 const STEAM_URL = 'https://store.steampowered.com/app/3590/Plants_vs_Zombies_GOTY_Edition/'

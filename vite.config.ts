@@ -1,4 +1,4 @@
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
@@ -22,8 +22,13 @@ function stripGameResources(): Plugin {
   }
 }
 
+const { version } = JSON.parse(readFileSync(r('./package.json'), 'utf8')) as { version: string }
+
 export default defineConfig({
   root: r('./web'),
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
   plugins: [vue(), tailwindcss(), stripGameResources()],
   resolve: {
     // @felinic/ui 以 workspace 源码形式引入，确保只有一份 vue
