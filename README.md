@@ -1,82 +1,99 @@
 # Cloud PvZ
 
-在网页上直接玩 Plants vs. Zombies（基于 [PvZ-Portable](https://github.com/wszqkzqk/PvZ-Portable) 的 WebAssembly 构建），并把存档同步到云端。
+Play Plants vs. Zombies right in your browser. Cloud PvZ runs [PvZ-Portable](https://github.com/wszqkzqk/PvZ-Portable), an open-source cross-platform reimplementation of the game, compiled to WebAssembly, and wraps it with an account system, cloud-synced saves and a save editor.
 
-> 本仓库**不包含**任何 PopCap / EA 的游戏素材。`main.pak` 需要来自你自己正版的 PvZ GOTY，且只在本地开发时使用，已被 `.gitignore` / `.dockerignore` 排除，构建产物也会检查并拒绝 `*.pak`。
+## Features
 
-## 当前进度
+- **Play in the browser**: the game runs in the page; music, sound and scaling can be adjusted next to it, and mute applies instantly.
+- **Cloud saves**: sign in and every in-game player syncs to your account on its own, with conflict handling across devices.
+- **Backups**: the last 20 sync versions of each player are kept and can be restored; up to 10 manual snapshots per player can be created, exported and restored.
+- **Save editor**: adventure level, mini-games / puzzles / survival, shop purchases, coins and the Zen Garden (with a rendered garden view), plus quick actions such as "unlock everything".
+- **Almanac and achievements**: animated plant and zombie cards and the 20 achievements, rendered from your local game resources.
+- **Import and export**: import saves exported by this site or the `userdata` folder of the original game / PvZ-Portable.
+- **Languages**: Simplified Chinese and English.
 
-- [x] 前端框架：Vue 3 + [@felinic/ui](https://github.com/felinics/ui)（git submodule，`packages/ui`）、i18n（简体中文 / English）、浅色 / 深色
-- [x] 游戏页：iframe 运行引擎，右侧游戏设置（启动用户、音量、静音、缩放、光标、垂直同步），全屏
-- [x] 存档页：读取本浏览器 IndexedDB 中的存档，按游戏内用户展示进度、金币、奖杯、成就
-- [x] 账号注册登录（better-auth，邮箱 + 密码；Drizzle + SQLite / D1）
-- [x] 存档云同步（S3 兼容存储，本地 MinIO / 线上 R2）：按游戏内用户单独同步，自动上传、换设备自动下载、逐个用户处理冲突
-- [x] 备份：每个用户的同步记录保留最近 20 次，可下载、可还原；另可手动创建快照（每个用户最多 10 个，可导出、还原、重命名）
-- [x] 存档编辑器（用户详情页）：概览与快捷操作（一键解锁全部等）、冒险关卡、挑战关卡、已遇到的图鉴、商店购买、禅境花园
-- [x] 图鉴与成就页：从本机游戏资源渲染植物 / 僵尸动画与成就图标
-- [x] 存档导入：本站导出的存档、原版或 PvZ-Portable 的 userdata 文件夹 / ZIP
-- [x] 存档管理：游戏内用户详情页，重命名、复制、导出、删除
-- [x] 必须登录才能使用；退出登录时（已同步的前提下）清空本机存档
+## Game resources
 
-## 开发
+The game needs its resource file `main.pak`. Once you have it, put it here:
 
-```bash
-git clone --recurse-submodules <repo>
-pnpm install
-cp .env.example .env                              # 填一个 NITRO_AUTH_SECRET（openssl rand -base64 32）
-pnpm dev:s3                                       # 本地 S3：MinIO，API :9100，控制台 :9101
-cp /path/to/your/main.pak web/public/main.pak     # 只在本地使用
-pnpm dev                                          # http://localhost:5173
-```
-
-`pnpm dev` 同时启动 Vite（前端，5173）和 Nitro（后端，3000），Vite 把 `/api` 代理到 Nitro。本地数据库是 `.data/cloud-pvz.sqlite`（Node 内置 `node:sqlite`），首次启动自动迁移。
-
-修改 `server/db/schema.ts` 后运行 `pnpm db:generate` 生成迁移。
-
-## 环境变量
-
-见 [.env.example](.env.example)。均为 Nitro 运行时配置，前缀 `NITRO_`：
-
-| 变量 | 说明 |
+| Setup | Location |
 |---|---|
-| `NITRO_AUTH_SECRET` | better-auth 密钥，必填 |
-| `NITRO_AUTH_BASE_URL` / `NITRO_AUTH_TRUSTED_ORIGINS` | 浏览器访问的地址 |
-| `NITRO_AUTH_IP_ADDRESS_HEADERS` | 限流用的可信 IP 请求头；Cloudflare 构建默认 `cf-connecting-ip` |
-| `NITRO_S3_ENDPOINT` / `REGION` / `BUCKET` / `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY` | S3 兼容存储（R2 的 region 填 `auto`） |
-| `NITRO_DATABASE_PATH` | Node / Docker 的 SQLite 文件路径 |
+| Local development | `web/public/main.pak` |
+| Docker | mount it to `/app/game/main.pak` in the container (see below) |
 
-## 构建与部署
+`*.pak` files are git-ignored and kept out of build output and the Docker image. In Docker the server only hands `main.pak` to signed-in users.
 
-| 目标 | 命令 | 说明 |
-|---|---|---|
-| Node | `pnpm build` → `pnpm preview` | Nitro `node-server` preset，数据库 `node:sqlite` |
-| Docker | `docker build -t cloud-pvz .` | `docker run -p 3000:3000 --env-file .env -v cloud-pvz-data:/app/.data cloud-pvz` |
-| Cloudflare Workers | `pnpm build:cf` → `npx wrangler deploy` | 数据库 D1（绑定名 `DB`），存档走 R2 的 S3 API |
+## Local development
 
-Cloudflare 首次部署：
+Requirements: Node.js 24, pnpm, Docker (for the local S3 server).
 
 ```bash
-npx wrangler d1 create cloud-pvz                         # 记下 database_id
-CLOUDFLARE_D1_ID=<id> pnpm build:cf
-npx wrangler d1 migrations apply cloud-pvz --remote -c .output/server/wrangler.json
-npx wrangler secret put NITRO_AUTH_SECRET                 # 其余 NITRO_* 同样用 secret 或 vars 配置
-npx wrangler deploy
+git clone --recurse-submodules https://github.com/sheepbox8646/cloud-pvz.git
+cd cloud-pvz
+pnpm install
+cp .env.example .env        # set NITRO_AUTH_SECRET, e.g. openssl rand -base64 32
+pnpm dev:s3                 # local S3 (MinIO): API on :9100, console on :9101
+# put main.pak at web/public/main.pak
+pnpm dev                    # http://localhost:5173
 ```
 
-## 目录
+`pnpm dev` starts Vite (frontend, port 5173) and Nitro (backend, port 3000); Vite proxies `/api` to Nitro. The local database is `.data/cloud-pvz.sqlite` (Node's built-in `node:sqlite`) and is migrated on first start.
+
+After changing `server/db/schema.ts`, run `pnpm db:generate` to create a migration.
+
+Other scripts: `pnpm type-check`, `pnpm build`, `pnpm preview`.
+
+## Docker
+
+```bash
+docker build -t cloud-pvz .
+docker run -d -p 3000:3000 \
+  --env-file .env \
+  -v cloud-pvz-data:/app/.data \
+  -v /path/to/main.pak:/app/game/main.pak:ro \
+  cloud-pvz
+```
+
+- `/app/.data` holds the SQLite database; keep it on a volume.
+- Set `NITRO_AUTH_BASE_URL` and `NITRO_AUTH_TRUSTED_ORIGINS` to the address you open in the browser, and point the `NITRO_S3_*` variables at your S3-compatible storage.
+
+## Configuration
+
+All settings are Nitro runtime config, read from environment variables prefixed with `NITRO_` (see [.env.example](.env.example)):
+
+| Variable | Description |
+|---|---|
+| `NITRO_AUTH_SECRET` | better-auth secret, required |
+| `NITRO_AUTH_BASE_URL` / `NITRO_AUTH_TRUSTED_ORIGINS` | the address users open in the browser |
+| `NITRO_AUTH_IP_ADDRESS_HEADERS` | trusted client-IP header for rate limiting, e.g. `x-forwarded-for` behind a reverse proxy; leave empty otherwise |
+| `NITRO_S3_ENDPOINT` / `NITRO_S3_REGION` / `NITRO_S3_BUCKET` / `NITRO_S3_ACCESS_KEY_ID` / `NITRO_S3_SECRET_ACCESS_KEY` | S3-compatible storage for saves |
+| `NITRO_DATABASE_PATH` | SQLite file path |
+| `NITRO_GAME_PAK_PATH` | path of `main.pak` when deployed (`/app/game/main.pak` in Docker) |
+
+## Engine updates
+
+The WebAssembly build of PvZ-Portable lives in `web/public/game/`, with its version in `web/public/game/VERSION`. The [Update engine](.github/workflows/update-engine.yml) workflow checks upstream releases daily; when a new version is published it builds it to WebAssembly from source and opens a pull request that replaces the engine files. It can also be started manually for a specific tag.
+
+## Project structure
 
 ```
-web/            前端（Vite root）
-  index.html    主应用
-  player.html   游戏 iframe（加载 public/game/ 下的引擎）
-  public/game/  PvZ-Portable 0.2.5 的 wasm 构建
-server/         Nitro 后端（api/、db/ 结构与迁移、utils/ 认证与存储）
-shared/pvz/     存档 / 注册表格式解析、云存档打包（前后端共用）
-compose.dev.yaml  本地 MinIO
-packages/ui/    @felinic/ui（submodule）
-docs/           设计文档
+web/              frontend (Vite root)
+  index.html      main app
+  player.html     game iframe, loads the engine from public/game/
+  public/game/    PvZ-Portable WebAssembly build
+server/           Nitro backend (API, database schema and migrations, auth and storage)
+shared/pvz/       save / registry formats, save editing and cloud packaging (shared by both sides)
+packages/ui/      @felinic/ui (git submodule)
+docs/             design notes
 ```
 
-## 许可证
+## Acknowledgements and disclaimer
 
-本项目以 [GPL-3.0](LICENSE) 发布。PvZ-Portable（开源的跨平台重实现）为 LGPL-3.0-or-later。Plants vs. Zombies 的知识产权归 PopCap / EA 所有。
+- Thanks to wszqkzqk (Zhou Qiankang) and all contributors for [PvZ-Portable](https://github.com/wszqkzqk/PvZ-Portable), the open-source cross-platform reimplementation the game in this project runs on.
+- Thanks to PopCap Games for creating Plants vs. Zombies.
+- The Plants vs. Zombies name, trademarks and all game assets belong to PopCap Games / Electronic Arts. This project is not affiliated with, authorized or endorsed by PopCap Games or Electronic Arts.
+- Game content is for study and discussion only, not for commercial use. Before using it, you must buy [Plants vs. Zombies: Game of the Year Edition on Steam](https://store.steampowered.com/app/3590/Plants_vs_Zombies_GOTY_Edition/).
+
+## License
+
+Cloud PvZ is released under the [GPL-3.0](LICENSE) license and provided "as is", without warranty of any kind. PvZ-Portable is licensed under LGPL-3.0-or-later.

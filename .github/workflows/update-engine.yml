@@ -1,0 +1,123 @@
+# 监控上游 PvZ-Portable 的发版：有新版本时在 Action 里拉取源码、编译成 WebAssembly，
+# 替换 web/public/game/ 下的 pvz-portable.js / .wasm，并开一个 PR。
+# 编译步骤与上游 .github/workflows/ci.yml 的 build-wasm 一致。
+#
+# 需要在仓库 Settings → Actions → General 打开
+# “Allow GitHub Actions to create and approve pull requests”，否则最后一步会因权限失败。
+
+name: Update engine
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 上游的版本标签（如 0.2.6），留空表示最新发布
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-engine
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: wszqkzqk/PvZ-Portable
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      update: ${{ steps.release.outputs.update }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Find upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${INPUT_TAG:-$(gh api "repos/$UPSTREAM/releases/latest" --jq .tag_name)}"
+          current="$(cat web/public/game/VERSION 2>/dev/null || true)"
+          echo "upstream: $tag, current: $current"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          # 版本相同，或这个版本的 PR 已经开过（无论是否已关闭），都不再重复
+          branch="chore/engine-$tag"
+          if [ "$tag" = "$current" ]; then
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
+            echo "PR for $tag already exists"
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.update == 'true'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout upstream
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM }}
+          ref: ${{ env.TAG }}
+          path: upstream
+          fetch-depth: 0
+
+      - name: Setup Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+      - name: Build libopenmpt for Emscripten
+        run: |
+          SYSROOT="$(em-config EMSCRIPTEN_ROOT)/cache/sysroot"
+          OPENMPT_TAG=$(git ls-remote --tags https://github.com/OpenMPT/openmpt.git 'refs/tags/libopenmpt-*' \
+            | sed 's|.*refs/tags/libopenmpt-||' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1 || true)
+          OPENMPT_TAG="${OPENMPT_TAG:-0.8.4}"
+          echo "Using libopenmpt $OPENMPT_TAG"
+          git clone --depth=1 --branch "libopenmpt-${OPENMPT_TAG}" https://github.com/OpenMPT/openmpt.git /tmp/libopenmpt-src
+          cd /tmp/libopenmpt-src
+          FLAGS="CONFIG=emscripten STATIC_LIB=1 SHARED_LIB=0 EXAMPLES=0 OPENMPT123=0 TEST=0 \
+            NO_ZLIB=1 NO_MPG123=1 NO_OGG=1 NO_VORBIS=1 NO_VORBISFILE=1 \
+            NO_PORTAUDIO=1 NO_PORTAUDIOCPP=1 NO_PULSEAUDIO=1 NO_SDL2=1 NO_FLAC=1 NO_SNDFILE=1"
+          emmake make $FLAGS -j"$(nproc)"
+          emmake make $FLAGS PREFIX="${SYSROOT}" install
+
+      - name: Build PvZ-Portable for WebAssembly
+        working-directory: upstream
+        run: |
+          emcmake cmake -G Ninja -B build-wasm -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-wasm -j"$(nproc)"
+
+      - name: Replace engine files
+        run: |
+          cp upstream/build-wasm/pvz-portable.js upstream/build-wasm/pvz-portable.wasm web/public/game/
+          echo "$TAG" > web/public/game/VERSION
+          rm -rf upstream
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/engine-${{ env.TAG }}
+          commit-message: 'chore: 更新 PvZ-Portable 引擎到 ${{ env.TAG }}'
+          title: 'chore: 更新 PvZ-Portable 引擎到 ${{ env.TAG }}'
+          body: |
+            上游 [${{ env.UPSTREAM }}](https://github.com/${{ env.UPSTREAM }}) 发布了 [${{ env.TAG }}](https://github.com/${{ env.UPSTREAM }}/releases/tag/${{ env.TAG }})，这个 PR 由 Action 从源码编译出 WebAssembly 版本并替换 `web/public/game/`。
+
+            合并前请在本地放好 `main.pak` 后试玩一遍：游戏能启动、存档能读写、静音开关能即时生效。
+          delete-branch: true

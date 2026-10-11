@@ -17,6 +17,8 @@ export default defineNitroConfig({
   // 运行时配置，可用环境变量覆盖：NITRO_AUTH_SECRET、NITRO_S3_ENDPOINT …
   runtimeConfig: {
     databasePath: '.data/cloud-pvz.sqlite',
+    // 部署时游戏资源 main.pak 的路径（Docker 里挂载进来）；留空则不提供。只给已登录用户下载
+    gamePakPath: '',
     auth: {
       secret: '',
       baseUrl: '',
