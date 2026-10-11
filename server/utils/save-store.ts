@@ -6,6 +6,8 @@ import type { H3Event } from 'h3'
 export interface SaveStore {
   put: (key: string, body: Uint8Array) => Promise<void>
   get: (key: string) => Promise<Uint8Array | null>
+  /** 大文件（如 main.pak）直接转发响应，不读进内存 */
+  open: (key: string) => Promise<Response | null>
   delete: (key: string) => Promise<void>
 }
 
@@ -44,6 +46,12 @@ export function useSaveStore(event: H3Event): SaveStore {
       if (response.status === 404) return null
       await check(response, 'get')
       return new Uint8Array(await response.arrayBuffer())
+    },
+    async open(key) {
+      const response = await client.fetch(url(key))
+      if (response.status === 404) return null
+      await check(response, 'get')
+      return response
     },
     async delete(key) {
       const response = await client.fetch(url(key), { method: 'DELETE' })
