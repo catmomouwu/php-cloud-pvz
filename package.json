@@ -1,6 +1,6 @@
 {
   "name": "cloud-pvz",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Play Plants vs. Zombies in the browser, built on PvZ-Portable (WebAssembly), with cloud-synced saves and a save editor.",
   "private": true,
   "type": "module",
