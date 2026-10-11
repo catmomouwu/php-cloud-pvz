@@ -6,9 +6,12 @@
 
 const GAME_PAK_KEY = 'game/main.pak'
 
-/** HEAD 的响应：200 + 文件大小，没有内容（返回 null 会变成 204 并丢掉 content-length） */
+/**
+ * HEAD 的响应：200 + 文件大小，没有内容（返回 null 会变成 204 并丢掉 content-length）。
+ * Cloudflare Workers 会去掉空响应的 content-length，所以大小另外放在 x-file-size 里。
+ */
 function headOnly(headers: Record<string, string>, size: number): Response {
-  return new Response(null, { status: 200, headers: { ...headers, 'content-length': String(size) } })
+  return new Response(null, { status: 200, headers: { ...headers, 'content-length': String(size), 'x-file-size': String(size) } })
 }
 
 export default defineEventHandler(async (event) => {

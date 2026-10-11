@@ -13,7 +13,8 @@ async function check() {
     const response = await fetch('/main.pak', { method: 'HEAD' })
     const contentType = response.headers.get('content-type') ?? ''
     if (response.ok && !contentType.includes('text/html')) {
-      size.value = Number(response.headers.get('content-length') ?? 0)
+      // 部署环境由服务端提供，大小在 x-file-size 里（Workers 会去掉 HEAD 响应的 content-length）
+      size.value = Number(response.headers.get('x-file-size') ?? response.headers.get('content-length') ?? 0)
       state.value = 'found'
       return
     }
