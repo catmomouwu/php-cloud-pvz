@@ -1,0 +1,60 @@
+# 部署到 Cloudflare Workers：构建 cloudflare_module 产物、对 D1 执行数据库迁移、发布 Worker。
+# 触发：Release 工作流发版后调用；在网页上手动发布 Release 时；也可以手动运行。
+# 线上运行配置（NITRO_*）是 Worker 的 secret，存在 Cloudflare 上，部署不会改动它们。
+#
+# 需要在仓库 Settings → Secrets and variables → Actions 里添加 CLOUDFLARE_API_TOKEN：
+# 权限至少包括“Workers 脚本：编辑”和“D1：编辑”（账户级）。
+
+name: Deploy
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: 9ee8f0c114470c034656417877004e02
+  CLOUDFLARE_D1_ID: 3eb2396a-9450-47ab-92b0-2a0410e91d9a
+  WRANGLER: wrangler@4
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://cloud-pvz.acbox0328.workers.dev
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build:cf
+
+      - name: Apply database migrations
+        working-directory: .output/server
+        run: npx -y "$WRANGLER" d1 migrations apply cloud-pvz --remote -c wrangler.json
+
+      - name: Deploy worker
+        working-directory: .output
+        run: npx -y "$WRANGLER" deploy -c server/wrangler.json
