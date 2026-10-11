@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+
+onlyBuiltDependencies:
+  - esbuild
+
+overrides:
+  # @felinic/ui 用到了 ErrorIcon，但声明的是 ^0.20.0（该版本没有这个导出）
+  '@memohai/icon': ^0.21.0

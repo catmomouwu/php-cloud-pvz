@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.output/
+.nitro/
+.data/
+.wrangler/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# 版权游戏资源：只在本地开发使用，绝不提交
+*.pak
+web/public/main.pak

@@ -1,0 +1,46 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@felinic/ui/style.css";
+/* MiSans Variable 作为中文回退字体，沿用 @felinic/ui showcase 的子集化封装 */
+@import "../../packages/ui/showcase/fonts/misans-vf.css";
+
+/* Tailwind v4 内容扫描：组件库源码 + 本应用 */
+@source "../../packages/ui/src";
+@source "./";
+
+:root {
+  text-autospace: normal;
+}
+
+/* 中文字重降档，与 @felinic/ui 宿主应用保持一致 */
+@layer utilities {
+  :lang(zh) .font-light { font-weight: 280; }
+  :lang(zh) .font-normal { font-weight: 315; }
+  :lang(zh) .font-medium { font-weight: 370; }
+  :lang(zh) .font-semibold { font-weight: 410; }
+  :lang(zh) .font-bold { font-weight: 450; }
+}
+:lang(zh) body {
+  font-weight: 335;
+}
+
+/*
+ * 同级页面切换（侧栏导航、登录 ↔ 注册）：与 Memoh 的打开动效同速 ——
+ * 进入 90ms ease-out、离开 40ms ease-in；同级之间没有方向，只做交叉淡入淡出，不位移。
+ * 列表 ↔ 详情用组件库的 swap-forward / swap-back（方向性推入 / 弹出）。
+ * 离开的页面脱离文档流叠在下面，进入的页面独占布局，二者同时交叉。
+ */
+.page-fade-enter-active {
+  transition: opacity 90ms ease-out;
+}
+
+.page-fade-leave-active {
+  position: absolute;
+  inset: 0;
+  transition: opacity 40ms ease-in;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}

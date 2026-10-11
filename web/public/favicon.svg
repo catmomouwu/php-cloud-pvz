@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    .mark { stroke: #1c1c1c; } .pea { fill: #1c1c1c; }
+    @media (prefers-color-scheme: dark) { .mark { stroke: #f2f2f2; } .pea { fill: #f2f2f2; } }
+  </style>
+  <path class="mark" d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+  <circle class="pea" cx="12" cy="14" r="1.75"/>
+</svg>

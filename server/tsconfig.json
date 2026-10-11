@@ -1,0 +1,13 @@
+{
+  "extends": "../.nitro/types/tsconfig.json",
+  "compilerOptions": {
+    // 覆盖 paths 时要带上 Nitro 生成的 #imports，以及 nitro.config 里的别名
+    "paths": {
+      "#imports": ["../.nitro/types/nitro-imports"],
+      "@shared/*": ["../shared/*"],
+      "#db-driver": ["./db/driver.node.ts"]
+    }
+  },
+  // Nitro 默认包含整个仓库；服务端只检查 server/ 与 shared/
+  "include": ["../.nitro/types/nitro.d.ts", "./**/*", "../shared/**/*"]
+}

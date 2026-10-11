@@ -1,0 +1,12 @@
+**/node_modules
+dist
+.output
+.nitro
+.data
+.wrangler
+.git
+.env
+.env.*
+
+# 版权游戏资源：绝不进入镜像
+**/*.pak
