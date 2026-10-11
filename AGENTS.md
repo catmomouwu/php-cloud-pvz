@@ -20,7 +20,7 @@ Rules for anyone (human or agent) changing this repository. Read [README.md](REA
 ## Game assets and secrets
 
 - `main.pak` and any other game assets must never enter git, build output or the Docker image. `scripts/postbuild-web.mjs` fails the build on `*.pak`; keep that check.
-- Deployed instances serve `main.pak` only to signed-in users (`server/routes/main.pak.get.ts`), from `NITRO_GAME_PAK_PATH` or `game/main.pak` in the S3 bucket.
+- Deployed instances serve `main.pak` only to signed-in users (`server/routes/main.pak.ts`), from `NITRO_GAME_PAK_PATH` or `game/main.pak` in the S3 bucket.
 - Never commit `.env`, tokens, keys or screenshots of the game. Test scripts and screenshots belong outside the repository.
 
 ## Code

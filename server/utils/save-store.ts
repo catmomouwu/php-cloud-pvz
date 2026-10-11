@@ -8,6 +8,8 @@ export interface SaveStore {
   get: (key: string) => Promise<Uint8Array | null>
   /** 大文件（如 main.pak）直接转发响应，不读进内存 */
   open: (key: string) => Promise<Response | null>
+  /** 只取对象大小（HEAD），不存在时返回 null */
+  size: (key: string) => Promise<number | null>
   delete: (key: string) => Promise<void>
 }
 
@@ -52,6 +54,12 @@ export function useSaveStore(event: H3Event): SaveStore {
       if (response.status === 404) return null
       await check(response, 'get')
       return response
+    },
+    async size(key) {
+      const response = await client.fetch(url(key), { method: 'HEAD' })
+      if (response.status === 404) return null
+      await check(response, 'head')
+      return Number(response.headers.get('content-length') ?? 0)
     },
     async delete(key) {
       const response = await client.fetch(url(key), { method: 'DELETE' })
