@@ -1,0 +1,1 @@
+import{An as e,Ct as t,Dn as n,ln as r}from"./vue-i18n-C72-EzzO.js";var i={},a={class:`h-full overflow-y-auto pb-16 [scrollbar-gutter:stable]`};function o(t,i){return n(),r(`div`,a,[e(t.$slots,`default`)])}var s=t(i,[[`render`,o]]);export{s as t};

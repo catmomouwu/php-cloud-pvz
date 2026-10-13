@@ -1,0 +1,2 @@
+# Apache 兜底：拒绝直接访问本目录（Nginx 部署时此文件无效但无害，靠 nginx.conf.example 里的 deny 规则）
+Require all denied

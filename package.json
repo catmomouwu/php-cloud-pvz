@@ -14,6 +14,7 @@
     "dev:web": "vite",
     "dev:server": "nitro dev --port 3000",
     "build": "vite build && node scripts/postbuild-web.mjs && nitro build",
+    "build:php": "vite build && node scripts/build-php.mjs",
     "build:cf": "vite build && node scripts/postbuild-web.mjs && NITRO_PRESET=cloudflare_module nitro build",
     "preview": "node .output/server/index.mjs",
     "type-check": "vue-tsc --build && nitro prepare && tsc --noEmit -p server",

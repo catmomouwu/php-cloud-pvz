@@ -1,0 +1,2 @@
+# Apache 兜底：拒绝直接访问数据目录（存档 zip 与 main.pak）
+Require all denied

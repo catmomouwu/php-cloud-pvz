@@ -1,0 +1,58 @@
+# Cloud PvZ — Nginx 配置片段
+#
+# 把下面的 location 块加入站点 server{}（虚拟主机面板一般提供"Nginx 配置/伪静态"输入框，
+# 或提供 nginx.conf include 的地方；PHP-FPM 的 location ~ \.php$ 部分沿用主机自带模板）。
+# 假设 webroot 里包含：index.php、index.html、player.html、assets/、game/、app/，
+# data 目录在 webroot 内时也需要 deny（推荐放到 webroot 外，见 php/README.md）。
+
+# ---- Cloud PvZ 开始 ----
+
+# app 与 data 拒绝直接访问（data 若已放到 webroot 外，此条可删）
+location ^~ /app/ {
+    deny all;
+}
+location ^~ /data/ {
+    deny all;
+}
+
+# 受保护的游戏资源 → PHP 鉴权后下发
+location = /main.pak {
+    rewrite ^ /index.php last;
+}
+
+# 语言包属性覆盖文件（中文版的 default.xml / Layout.xml，可选）
+location ^~ /game-properties/ {
+    rewrite ^ /index.php last;
+}
+
+# 后端 API → PHP
+location ^~ /api/ {
+    rewrite ^ /index.php last;
+}
+
+# 前端构建产物：文件名带哈希，可长缓存
+location ^~ /assets/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+}
+
+# 游戏引擎：约 7MB wasm，缓存 1 天
+location ^~ /game/ {
+    add_header Cache-Control "public, max-age=86400";
+    types { application/wasm wasm; }
+}
+
+# SPA 回退：真实文件直出，其余路径回退到 index.html
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+# ---- Cloud PvZ 结束 ----
+
+
+# 若主机面板只允许填"伪静态规则"（通常等价于写在 location / 内的 rewrite），
+# 可改用以下简化版（需要面板支持正则 rewrite），并务必确认 /app、/data 能被 deny：
+
+# rewrite ^/(api|main\.pak|game-properties) /index.php last;
+# if (!-e $request_filename) {
+#     rewrite ^ /index.html last;
+# }

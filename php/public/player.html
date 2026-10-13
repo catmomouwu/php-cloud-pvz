@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud PvZ player</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}html,body{background:#000;width:100%;height:100%;overflow:hidden}#canvas-container{justify-content:center;align-items:center;width:100%;height:100%;display:flex}#canvas-container:fullscreen{width:100%;height:100%}canvas#canvas{outline:none;display:block}canvas#canvas[data-scale=integer]{image-rendering:pixelated}#pvz-soft-keyboard{opacity:0;resize:none;pointer-events:none;border:0;width:1px;height:1px;padding:0;font-size:16px;position:fixed;top:0;left:0}</style>
+  <script type="module" crossorigin src="/assets/player-CLebRufE.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/player-protocol-Bg_JqL6p.js">
+</head>
+<body>
+  <!-- id 由引擎约定：#canvas-container 是游戏内全屏的目标，#pvz-soft-keyboard 用于软键盘输入 -->
+  <div id="canvas-container">
+    <canvas id="canvas" width="800" height="600" tabindex="0"></canvas>
+  </div>
+  <textarea id="pvz-soft-keyboard" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done"></textarea>
+</body>
+</html>

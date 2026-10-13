@@ -211,6 +211,16 @@ async function prepareResources(): Promise<boolean> {
   mkdirp('/properties')
   fs().writeFile('/properties/partner.xml', PARTNER_XML)
   fs().writeFile('/properties/partner_logo.png', Uint8Array.from(atob(PARTNER_LOGO_PNG_BASE64), c => c.charCodeAt(0)))
+
+  // 语言包自带的属性覆盖（如中文版的 default.xml / Layout.xml）：
+  // 引擎在 LawnStrings 之后加载它们，用同名键覆盖文本与排版。
+  // 文件不存在（404，英文版部署）或返回异常时直接跳过。
+  await Promise.allSettled(['default.xml', 'Layout.xml'].map(async (name) => {
+    const property = await fetch(`/game-properties/${name}`)
+    const type = property.headers.get('content-type') ?? ''
+    if (!property.ok || type.includes('text/html')) return
+    fs().writeFile(`/properties/${name}`, new Uint8Array(await property.arrayBuffer()))
+  }))
   return true
 }
 
