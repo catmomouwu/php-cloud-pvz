@@ -70,6 +70,39 @@ All settings are Nitro runtime config, read from environment variables prefixed 
 | `NITRO_DATABASE_PATH` | SQLite file path |
 | `NITRO_GAME_PAK_PATH` | path of `main.pak` when deployed (`/app/game/main.pak` in Docker) |
 
+## PHP shared hosting deployment
+
+In addition to the Nitro/Cloudflare deployment, this fork supports traditional shared hosting with **PHP 8.3 + MySQL 5.7 + FTP + Nginx** (zero Composer dependencies).
+
+### Quick start
+
+1. Download `dist.zip` from the [latest Release](../../releases/latest)
+2. Unzip and upload the contents to your web hosting via FTP (two layouts supported — see [php/README.md](php/README.md) for details)
+3. Create `app/config.php` from `app/config.example.php` with your MySQL credentials
+4. Upload `main.pak` to `data/game/main.pak`
+5. Configure Nginx (see [nginx.conf.example](php/nginx.conf.example))
+
+### Build from source
+
+```bash
+pnpm install
+pnpm run build:php
+```
+
+The deployable package is generated in `php/public/` (frontend assets + `index.php` entry). Full deployment instructions are in [php/README.md](php/README.md).
+
+### Key differences from the Nitro version
+
+| Aspect | Nitro / Cloudflare | PHP shared hosting |
+|---|---|---|
+| Runtime | Node.js / Workers | PHP 8.3 |
+| Database | SQLite / D1 | MySQL 5.7 (or SQLite) |
+| Storage | S3-compatible | Local filesystem |
+| Dependencies | pnpm, Nitro, better-auth, Drizzle | Zero Composer deps |
+| Auth | better-auth library | Built-in (bcrypt + HttpOnly cookie) |
+
+The PHP backend replicates all 15 API endpoints with byte-compatible save formats and the same optimistic concurrency semantics.
+
 ## Engine updates
 
 The WebAssembly build of PvZ-Portable lives in `web/public/game/`, with its version in `web/public/game/VERSION`. The [Update engine](.github/workflows/update-engine.yml) workflow checks upstream releases daily; when a new version is published it builds it to WebAssembly from source and opens a pull request that replaces the engine files. It can also be started manually for a specific tag.
@@ -84,6 +117,12 @@ web/              frontend (Vite root)
 server/           Nitro backend (API, database schema and migrations, auth and storage)
 shared/pvz/       save / registry formats, save editing and cloud packaging (shared by both sides)
 packages/ui/      @felinic/ui (git submodule)
+php/              PHP shared hosting deployment (backend + built frontend + docs)
+  app/            PHP backend (zero Composer deps)
+  public/         built frontend assets + index.php entry
+  data/           runtime data (saves, main.pak) — gitignored
+  README.md       deployment guide for PHP hosting
+  nginx.conf.example
 docs/             design notes
 ```
 

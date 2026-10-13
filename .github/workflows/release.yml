@@ -1,5 +1,6 @@
 # 推送 v 开头的 tag（如 v0.2.0）时：用 git-cliff 按约定式提交生成本次的 changelog，
-# 创建 GitHub Release，然后调用部署工作流把这个版本部署到 Cloudflare。
+# 构建 PHP 虚拟主机部署包（dist.zip），创建 GitHub Release 并上传 dist.zip，
+# 然后调用部署工作流把这个版本部署到 Cloudflare。
 # tag 带连字符（如 v0.2.0-beta.1）时标记为预发布。
 
 name: Release
@@ -18,6 +19,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build PHP deployment package
+        run: pnpm run build:php
+
+      - name: Create dist.zip
+        run: |
+          cd php
+          zip -r ../dist.zip public/ app/ data/ nginx.conf.example README.md router-dev.php -x "*/config.php"
+          cd ..
+          ls -lh dist.zip
 
       - name: Generate changelog
         id: changelog
@@ -35,7 +59,7 @@ jobs:
         run: |
           flags=()
           if [[ "$TAG" == *-* ]]; then flags+=(--prerelease); fi
-          gh release create "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag "${flags[@]}"
+          gh release create "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md --verify-tag "${flags[@]}" dist.zip
 
   # 用 GITHUB_TOKEN 创建的 Release 不会再触发 release 事件，所以这里直接调用部署工作流
   deploy:
